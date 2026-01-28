@@ -1,0 +1,262 @@
+================================================================= test session starts =================================================================
+platform win32 -- Python 3.14.2, pytest-9.0.2, pluggy-1.6.0 -- C:\Users\Nikita\AppData\Local\pypoetry\Cache\virtualenvs\poewikibot-1gs9oJRX-py3.14\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\Nikita\PycharmProjects\PoeWikiBot
+configfile: pyproject.toml
+plugins: anyio-4.12.1, asyncio-1.3.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 11 items
+tests/test_item_types.py::test_item_fields_resolution[Starforge-Two-Handed Sword-expected_fields0] FAILED                                        [  9%]
+tests/test_item_types.py::test_item_fields_resolution[Voidforge-Two-Handed Sword-expected_fields1] FAILED                                        [ 18%]
+tests/test_item_types.py::test_item_fields_resolution[Driftwood Club-One-Handed Mace-expected_fields2] FAILED                                    [ 27%]
+tests/test_item_types.py::test_item_fields_resolution[Quill Rain-Bow-expected_fields3] FAILED                                                    [ 36%]
+tests/test_item_types.py::test_item_fields_resolution[Tabula Rasa-Body Armour-expected_fields4] FAILED                                           [ 45%]
+tests/test_item_types.py::test_item_fields_resolution[Goldrim-Helmet-expected_fields5] FAILED                                                    [ 54%]
+tests/test_item_types.py::test_item_fields_resolution[Shavronne's Wrappings-Body Armour-expected_fields6] FAILED                                 [ 63%]
+tests/test_item_types.py::test_item_fields_resolution[The Surrender-Shield-expected_fields7] FAILED                                              [ 72%]
+tests/test_item_types.py::test_item_fields_resolution[Astramentis-Amulet-expected_fields8] PASSED                                                [ 81%]
+tests/test_item_types.py::test_item_fields_resolution[Headhunter-Belt-expected_fields9] PASSED                                                   [ 90%]
+tests/test_item_types.py::test_class_mapping_completeness PASSED                                                                                 [100%]
+====================================================================== FAILURES =======================================================================
+______________________________________ test_item_fields_resolution[Starforge-Two-Handed Sword-expected_fields0] _______________________________________
+item_name = 'Starforge', expected_class = 'Two-Handed Sword', expected_fields = ['physical_damage_min', 'attack_speed']
+    @pytest.mark.parametrize("item_name, expected_class, expected_fields", TEST_ITEMS)
+    @pytest.mark.asyncio
+    async def test_item_fields_resolution(item_name, expected_class, expected_fields):
+        """
+        Verifies that items of different classes correctly resolve their specific fields.
+        This hits the live Wiki API.
+        """
+        item = await get_item_details(item_name)
+        assert item is not None, f"Could not find item: {item_name}"
+        assert item.item_class == expected_class, f"Expected class {expected_class}, got {item.item_class}"
+
+        # Check if specific fields are populated (not necessarily non-zero, but present)
+        # Note: NamedTuple fields are always present, but we want to see if they were fetched.
+        # We'll check if at least one of the expected stats is non-None if the item should have it.
+
+        any_field_populated = False
+        for field in expected_fields:
+            val = getattr(item, field)
+            logging.info(f"Item: {item_name}, Field: {field}, Value: {val}")
+            if val is not None:
+                any_field_populated = True
+
+        if expected_fields:
+>           assert any_field_populated, f"No expected fields were populated for {item_name}"
+E           AssertionError: No expected fields were populated for Starforge
+E           assert False
+tests\test_item_types.py:51: AssertionError
+______________________________________ test_item_fields_resolution[Voidforge-Two-Handed Sword-expected_fields1] _______________________________________
+item_name = 'Voidforge', expected_class = 'Two-Handed Sword', expected_fields = ['physical_damage_min', 'attack_speed']
+    @pytest.mark.parametrize("item_name, expected_class, expected_fields", TEST_ITEMS)
+    @pytest.mark.asyncio
+    async def test_item_fields_resolution(item_name, expected_class, expected_fields):
+        """
+        Verifies that items of different classes correctly resolve their specific fields.
+        This hits the live Wiki API.
+        """
+        item = await get_item_details(item_name)
+        assert item is not None, f"Could not find item: {item_name}"
+        assert item.item_class == expected_class, f"Expected class {expected_class}, got {item.item_class}"
+
+        # Check if specific fields are populated (not necessarily non-zero, but present)
+        # Note: NamedTuple fields are always present, but we want to see if they were fetched.
+        # We'll check if at least one of the expected stats is non-None if the item should have it.
+
+        any_field_populated = False
+        for field in expected_fields:
+            val = getattr(item, field)
+            logging.info(f"Item: {item_name}, Field: {field}, Value: {val}")
+            if val is not None:
+                any_field_populated = True
+
+        if expected_fields:
+>           assert any_field_populated, f"No expected fields were populated for {item_name}"
+E           AssertionError: No expected fields were populated for Voidforge
+E           assert False
+tests\test_item_types.py:51: AssertionError
+____________________________________ test_item_fields_resolution[Driftwood Club-One-Handed Mace-expected_fields2] _____________________________________
+item_name = 'Driftwood Club', expected_class = 'One-Handed Mace', expected_fields = ['physical_damage_min', 'attack_speed']
+    @pytest.mark.parametrize("item_name, expected_class, expected_fields", TEST_ITEMS)
+    @pytest.mark.asyncio
+    async def test_item_fields_resolution(item_name, expected_class, expected_fields):
+        """
+        Verifies that items of different classes correctly resolve their specific fields.
+        This hits the live Wiki API.
+        """
+        item = await get_item_details(item_name)
+        assert item is not None, f"Could not find item: {item_name}"
+        assert item.item_class == expected_class, f"Expected class {expected_class}, got {item.item_class}"
+
+        # Check if specific fields are populated (not necessarily non-zero, but present)
+        # Note: NamedTuple fields are always present, but we want to see if they were fetched.
+        # We'll check if at least one of the expected stats is non-None if the item should have it.
+
+        any_field_populated = False
+        for field in expected_fields:
+            val = getattr(item, field)
+            logging.info(f"Item: {item_name}, Field: {field}, Value: {val}")
+            if val is not None:
+                any_field_populated = True
+
+        if expected_fields:
+>           assert any_field_populated, f"No expected fields were populated for {item_name}"
+E           AssertionError: No expected fields were populated for Driftwood Club
+E           assert False
+tests\test_item_types.py:51: AssertionError
+____________________________________________ test_item_fields_resolution[Quill Rain-Bow-expected_fields3] _____________________________________________
+item_name = 'Quill Rain', expected_class = 'Bow', expected_fields = ['physical_damage_min', 'attack_speed']
+    @pytest.mark.parametrize("item_name, expected_class, expected_fields", TEST_ITEMS)
+    @pytest.mark.asyncio
+    async def test_item_fields_resolution(item_name, expected_class, expected_fields):
+        """
+        Verifies that items of different classes correctly resolve their specific fields.
+        This hits the live Wiki API.
+        """
+        item = await get_item_details(item_name)
+        assert item is not None, f"Could not find item: {item_name}"
+        assert item.item_class == expected_class, f"Expected class {expected_class}, got {item.item_class}"
+
+        # Check if specific fields are populated (not necessarily non-zero, but present)
+        # Note: NamedTuple fields are always present, but we want to see if they were fetched.
+        # We'll check if at least one of the expected stats is non-None if the item should have it.
+
+        any_field_populated = False
+        for field in expected_fields:
+            val = getattr(item, field)
+            logging.info(f"Item: {item_name}, Field: {field}, Value: {val}")
+            if val is not None:
+                any_field_populated = True
+
+        if expected_fields:
+>           assert any_field_populated, f"No expected fields were populated for {item_name}"
+E           AssertionError: No expected fields were populated for Quill Rain
+E           assert False
+tests\test_item_types.py:51: AssertionError
+________________________________________ test_item_fields_resolution[Tabula Rasa-Body Armour-expected_fields4] ________________________________________
+item_name = 'Tabula Rasa', expected_class = 'Body Armour', expected_fields = ['armour', 'energy_shield']
+    @pytest.mark.parametrize("item_name, expected_class, expected_fields", TEST_ITEMS)
+    @pytest.mark.asyncio
+    async def test_item_fields_resolution(item_name, expected_class, expected_fields):
+        """
+        Verifies that items of different classes correctly resolve their specific fields.
+        This hits the live Wiki API.
+        """
+        item = await get_item_details(item_name)
+        assert item is not None, f"Could not find item: {item_name}"
+        assert item.item_class == expected_class, f"Expected class {expected_class}, got {item.item_class}"
+
+        # Check if specific fields are populated (not necessarily non-zero, but present)
+        # Note: NamedTuple fields are always present, but we want to see if they were fetched.
+        # We'll check if at least one of the expected stats is non-None if the item should have it.
+
+        any_field_populated = False
+        for field in expected_fields:
+            val = getattr(item, field)
+            logging.info(f"Item: {item_name}, Field: {field}, Value: {val}")
+            if val is not None:
+                any_field_populated = True
+
+        if expected_fields:
+>           assert any_field_populated, f"No expected fields were populated for {item_name}"
+E           AssertionError: No expected fields were populated for Tabula Rasa
+E           assert False
+tests\test_item_types.py:51: AssertionError
+____________________________________________ test_item_fields_resolution[Goldrim-Helmet-expected_fields5] _____________________________________________
+item_name = 'Goldrim', expected_class = 'Helmet', expected_fields = ['armour', 'evasion', 'energy_shield']
+    @pytest.mark.parametrize("item_name, expected_class, expected_fields", TEST_ITEMS)
+    @pytest.mark.asyncio
+    async def test_item_fields_resolution(item_name, expected_class, expected_fields):
+        """
+        Verifies that items of different classes correctly resolve their specific fields.
+        This hits the live Wiki API.
+        """
+        item = await get_item_details(item_name)
+        assert item is not None, f"Could not find item: {item_name}"
+        assert item.item_class == expected_class, f"Expected class {expected_class}, got {item.item_class}"
+
+        # Check if specific fields are populated (not necessarily non-zero, but present)
+        # Note: NamedTuple fields are always present, but we want to see if they were fetched.
+        # We'll check if at least one of the expected stats is non-None if the item should have it.
+
+        any_field_populated = False
+        for field in expected_fields:
+            val = getattr(item, field)
+            logging.info(f"Item: {item_name}, Field: {field}, Value: {val}")
+            if val is not None:
+                any_field_populated = True
+
+        if expected_fields:
+>           assert any_field_populated, f"No expected fields were populated for {item_name}"
+E           AssertionError: No expected fields were populated for Goldrim
+E           assert False
+tests\test_item_types.py:51: AssertionError
+___________________________________ test_item_fields_resolution[Shavronne's Wrappings-Body Armour-expected_fields6] ___________________________________
+item_name = "Shavronne's Wrappings", expected_class = 'Body Armour', expected_fields = ['energy_shield']
+    @pytest.mark.parametrize("item_name, expected_class, expected_fields", TEST_ITEMS)
+    @pytest.mark.asyncio
+    async def test_item_fields_resolution(item_name, expected_class, expected_fields):
+        """
+        Verifies that items of different classes correctly resolve their specific fields.
+        This hits the live Wiki API.
+        """
+        item = await get_item_details(item_name)
+        assert item is not None, f"Could not find item: {item_name}"
+        assert item.item_class == expected_class, f"Expected class {expected_class}, got {item.item_class}"
+
+        # Check if specific fields are populated (not necessarily non-zero, but present)
+        # Note: NamedTuple fields are always present, but we want to see if they were fetched.
+        # We'll check if at least one of the expected stats is non-None if the item should have it.
+
+        any_field_populated = False
+        for field in expected_fields:
+            val = getattr(item, field)
+            logging.info(f"Item: {item_name}, Field: {field}, Value: {val}")
+            if val is not None:
+                any_field_populated = True
+
+        if expected_fields:
+>           assert any_field_populated, f"No expected fields were populated for {item_name}"
+E           AssertionError: No expected fields were populated for Shavronne's Wrappings
+E           assert False
+tests\test_item_types.py:51: AssertionError
+_________________________________________ test_item_fields_resolution[The Surrender-Shield-expected_fields7] __________________________________________
+item_name = 'The Surrender', expected_class = 'Shield', expected_fields = ['armour']
+    @pytest.mark.parametrize("item_name, expected_class, expected_fields", TEST_ITEMS)
+    @pytest.mark.asyncio
+    async def test_item_fields_resolution(item_name, expected_class, expected_fields):
+        """
+        Verifies that items of different classes correctly resolve their specific fields.
+        This hits the live Wiki API.
+        """
+        item = await get_item_details(item_name)
+        assert item is not None, f"Could not find item: {item_name}"
+        assert item.item_class == expected_class, f"Expected class {expected_class}, got {item.item_class}"
+
+        # Check if specific fields are populated (not necessarily non-zero, but present)
+        # Note: NamedTuple fields are always present, but we want to see if they were fetched.
+        # We'll check if at least one of the expected stats is non-None if the item should have it.
+
+        any_field_populated = False
+        for field in expected_fields:
+            val = getattr(item, field)
+            logging.info(f"Item: {item_name}, Field: {field}, Value: {val}")
+            if val is not None:
+                any_field_populated = True
+
+        if expected_fields:
+>           assert any_field_populated, f"No expected fields were populated for {item_name}"
+E           AssertionError: No expected fields were populated for The Surrender
+E           assert False
+tests\test_item_types.py:51: AssertionError
+=============================================================== short test summary info ===============================================================
+FAILED tests/test_item_types.py::test_item_fields_resolution[Starforge-Two-Handed Sword-expected_fields0] - AssertionError: No expected fields were populated for Starforge
+FAILED tests/test_item_types.py::test_item_fields_resolution[Voidforge-Two-Handed Sword-expected_fields1] - AssertionError: No expected fields were populated for Voidforge
+FAILED tests/test_item_types.py::test_item_fields_resolution[Driftwood Club-One-Handed Mace-expected_fields2] - AssertionError: No expected fields were populated for Driftwood Club
+FAILED tests/test_item_types.py::test_item_fields_resolution[Quill Rain-Bow-expected_fields3] - AssertionError: No expected fields were populated for Quill Rain
+FAILED tests/test_item_types.py::test_item_fields_resolution[Tabula Rasa-Body Armour-expected_fields4] - AssertionError: No expected fields were populated for Tabula Rasa
+FAILED tests/test_item_types.py::test_item_fields_resolution[Goldrim-Helmet-expected_fields5] - AssertionError: No expected fields were populated for Goldrim
+FAILED tests/test_item_types.py::test_item_fields_resolution[Shavronne's Wrappings-Body Armour-expected_fields6] - AssertionError: No expected fields were populated for Shavronne's Wrappings
+FAILED tests/test_item_types.py::test_item_fields_resolution[The Surrender-Shield-expected_fields7] - AssertionError: No expected fields were populated for The Surrender
+============================================================ 8 failed, 3 passed in 42.76s =============================================================
