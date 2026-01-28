@@ -90,21 +90,19 @@ Search for items while chatting.
 
 If items are not updating after you select them:
 
-1. **Manual Refresh**: Click the **"🔄 Load Details"** button on the result. This uses a direct callback to the bot and is the most reliable way to fetch details if Telegram is being slow.
-
-2. **Enable Inline Feedback**: 
+1. **Enable Inline Feedback**: 
    - Open [@BotFather](https://t.me/botfather).
    - Select your bot using `/mybots`.
    - Go to **Bot Settings** > **Inline Mode** > **Inline Feedback**.
    - Set it to **100%**.
 
-3. **Check Privacy Mode**:
+2. **Check Privacy Mode**:
    - In [@BotFather](https://t.me/botfather), go to **Bot Settings** > **Group Privacy**.
    - Set it to **Disabled**. This ensures the bot can see messages sent "via" it in groups and DMs.
 
-4. **Check for Multiple Instances**: Ensure you don't have another instance of the bot running with the same token. If two instances are polling, they will "steal" updates from each other.
+3. **Check for Multiple Instances**: Ensure you don't have another instance of the bot running with the same token. If two instances are polling, they will "steal" updates from each other.
 
-5. **Check Logs**: The bot logs when it receives a "chosen result" event. If you don't see `Chosen inline result received: ...` in your console, Telegram is not sending the feedback.
+4. **Check Logs**: The bot logs when it receives a "chosen result" event. If you don't see `Chosen inline result received: ...` in your console, Telegram is not sending the feedback.
 
 ---
 
@@ -156,6 +154,7 @@ poetry run pytest
 ---
 
 ## 📜 License
-This project is open-source. Feel free to use and contribute!
+This project is licensed under the **MIT License**. See the [LICENSE](LICENSE) file for details.
 
-*Disclaimer: This tool is not affiliated with Grinding Gear Games or the Path of Exile Wiki. Data is provided by the PoE Wiki under CC BY-NC-SA 3.0.*
+### Disclaimer
+This tool is not affiliated with Grinding Gear Games or the Path of Exile Wiki. Data is provided by the [PoE Wiki](https://www.poewiki.net/) under [CC BY-NC-SA 3.0](https://creativecommons.org/licenses/by-nc-sa/3.0/).

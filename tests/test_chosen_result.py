@@ -108,39 +108,3 @@ async def test_on_message_fallback():
         assert kwargs["message_id"] == 789
         assert "Starforge" in kwargs["text"]
         assert "Loading mods..." not in kwargs["text"]
-
-@pytest.mark.asyncio
-async def test_on_callback_query_success():
-    # Mock update
-    update = MagicMock(spec=Update)
-    update.callback_query = MagicMock()
-    update.callback_query.answer = AsyncMock()
-    update.callback_query.data = "resolve|Starforge"
-    update.callback_query.inline_message_id = "inline123"
-    update.effective_chat = None
-    update.effective_message = None
-    
-    # Mock context
-    context = MagicMock(spec=ContextTypes.DEFAULT_TYPE)
-    context.bot.edit_message_text = AsyncMock()
-    
-    # Mock API
-    mock_item = Item(
-        name="Starforge",
-        rarity="Unique",
-        item_class="Two-Handed Sword",
-        stats={}
-    )
-    
-    with patch("poewikibot.bot.get_item_details", return_value=mock_item):
-        from poewikibot.bot import on_callback_query
-        await on_callback_query(update, context)
-        
-        # Check if answer was called
-        update.callback_query.answer.assert_called_once()
-        
-        # Check if edit_message_text was called with inline_message_id
-        assert context.bot.edit_message_text.call_count >= 1
-        kwargs = context.bot.edit_message_text.call_args.kwargs
-        assert kwargs["inline_message_id"] == "inline123"
-        assert "Starforge" in kwargs["text"]

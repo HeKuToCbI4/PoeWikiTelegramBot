@@ -2,7 +2,7 @@ import logging
 import html
 from urllib.parse import quote
 from telegram import Update, InlineQueryResultArticle, InputTextMessageContent, LinkPreviewOptions, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, InlineQueryHandler, ChosenInlineResultHandler, MessageHandler, CallbackQueryHandler, filters
+from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, InlineQueryHandler, ChosenInlineResultHandler, MessageHandler, filters
 from poewikibot.api import query_items, get_item_details
 from poewikibot.config import settings
 import uuid
@@ -92,36 +92,12 @@ async def inline_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 url=wiki_url,
                 thumbnail_url=item.image_url if item.image_url else "https://www.poewiki.net/w/resources/assets/wiki.png",
                 reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("📖 View on Wiki", url=wiki_url),
-                    InlineKeyboardButton("🔄 Load Details", callback_data=f"resolve|{name}")
+                    InlineKeyboardButton("📖 View on Wiki", url=wiki_url)
                 ]])
             )
         )
 
     await update.inline_query.answer(articles, cache_time=0)
-
-async def on_callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """
-    Handles the 'Load Details' button click.
-    Provides a manual fallback if chosen_inline_result is delayed or missing.
-    """
-    query = update.callback_query
-    # Answer immediately to stop loading animation
-    await query.answer()
-    
-    if not query.data or not query.data.startswith("resolve|"):
-        return
-        
-    item_name = query.data.split("|")[1]
-    logging.info(f"Manual resolution triggered via CallbackQuery for: {item_name}")
-    
-    await resolve_item_details(
-        item_name, 
-        context, 
-        inline_message_id=query.inline_message_id,
-        chat_id=update.effective_chat.id if update.effective_chat else None,
-        message_id=update.effective_message.message_id if update.effective_message else None
-    )
 
 async def on_chosen_inline_result(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
@@ -450,7 +426,6 @@ def run_bot():
     application.add_handler(CommandHandler('start', start))
     application.add_handler(InlineQueryHandler(inline_query))
     application.add_handler(ChosenInlineResultHandler(on_chosen_inline_result))
-    application.add_handler(CallbackQueryHandler(on_callback_query))
     application.add_handler(MessageHandler(filters.TEXT & filters.VIA_BOT, on_message))
 
     print("Bot is starting...")
