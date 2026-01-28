@@ -1,6 +1,6 @@
 # PoEWikiBot 🛡️🤖
 
-![Tests](https://github.com/yourusername/PoeWikiBot/actions/workflows/tests.yml/badge.svg)
+![Tests](https://github.com/HeKuToCbI4/PoeWikiBot/actions/workflows/tests.yml/badge.svg)
 
 A simple tool to search the [Path of Exile Wiki](https://www.poewiki.net/) from your terminal or Telegram. It uses the Wiki's Cargo query system to find item details quickly.
 
@@ -28,7 +28,7 @@ You can use it as a command-line tool for quick lookups or run it as a Telegram 
 ### Local Setup
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/yourusername/PoeWikiBot.git
+   git clone https://github.com/HeKuToCbI4/PoeWikiBot.git
    cd PoeWikiBot
    ```
 
