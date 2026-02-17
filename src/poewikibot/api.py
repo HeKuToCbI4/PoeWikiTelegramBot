@@ -6,6 +6,27 @@ from dataclasses import dataclass, field
 from poewikibot.config import settings
 from poewikibot.models import get_table_for_class, get_fields_for_table, validate_field
 
+def dehtmlize(text: Optional[str]) -> Optional[str]:
+    """
+    Strips HTML tags and unescapes HTML entities.
+    Example: '&quot;They said...&quot; - Klopek' -> '"They said..." - Klopek'
+             'The wolf greeted the king,<br>In the light' -> 'The wolf greeted the king,\nIn the light'
+    """
+    if not text:
+        return text
+    
+    # Replace common breaks with newlines before stripping other tags
+    text = re.sub(r'<(br|BR)\s*/?>', '\n', text)
+    
+    # Strip all other HTML tags
+    text = re.sub(r'<[^>]+>', '', text)
+    
+    # Unescape HTML entities (e.g. &quot; -> ")
+    import html
+    text = html.unescape(text)
+    
+    return text.strip()
+
 @dataclass
 class Item:
     name: str
@@ -241,8 +262,8 @@ async def populate_item_details(item: Item, client: httpx.AsyncClient, include_m
             if fallback_mods["explicit"] and not explicit:
                 explicit = "<br>".join(fallback_mods["explicit"])
         
-        item.implicit_mods = implicit
-        item.explicit_mods = explicit
+        item.implicit_mods = dehtmlize(implicit)
+        item.explicit_mods = dehtmlize(explicit)
 
     # 2. Fetch metadata (required_level, flavour_text, description)
     s_params = {
@@ -258,8 +279,8 @@ async def populate_item_details(item: Item, client: httpx.AsyncClient, include_m
         if s_data:
             s_item = s_data[0]["title"]
             item.required_level = s_item.get("required level") or item.required_level
-            item.flavour_text = s_item.get("flavour text") or item.flavour_text
-            item.description = s_item.get("description") or item.description
+            item.flavour_text = dehtmlize(s_item.get("flavour text")) or item.flavour_text
+            item.description = dehtmlize(s_item.get("description")) or item.description
     except Exception as e:
         logging.warning(f"Failed to fetch metadata for {name}: {e}")
 
@@ -296,7 +317,42 @@ async def populate_item_details(item: Item, client: httpx.AsyncClient, include_m
                         val = sup_item.get(f.replace("_", " "))
                         if val:
                             normalized_field = f.replace(" ", "_")
-                            item.stats[normalized_field] = val
+                            item.stats[normalized_field] = dehtmlize(str(val)) if isinstance(val, str) else val
+                    # Passive-specific enrichment: set description/icon if missing
+                    if supplementary_table == "passive_skills":
+                        # Prefer stat_text, then flavour_text, then reminder_text
+                        desc_candidates = [
+                            sup_item.get("stat text"),
+                            sup_item.get("flavour text"),
+                            sup_item.get("reminder text"),
+                        ]
+                        for dc in desc_candidates:
+                            if dc:
+                                item.description = dehtmlize(str(dc))
+                                break
+                        if not item.flavour_text and sup_item.get("flavour text"):
+                            item.flavour_text = dehtmlize(str(sup_item.get("flavour text")))
+                        if not item.image_url:
+                            icon_val = sup_item.get("icon") or sup_item.get("inventory icon")
+                            if icon_val:
+                                icon_str = str(icon_val)
+                                if icon_str.startswith("http://") or icon_str.startswith("https://"):
+                                    item.image_url = icon_str
+                                else:
+                                    # Try resolving as File: title (use basename if needed)
+                                    icon_title = icon_str if icon_str.startswith("File:") else None
+                                    if not icon_title:
+                                        import os
+                                        base = os.path.basename(icon_str)
+                                        if base:
+                                            icon_title = f"File:{base}"
+                                    if icon_title:
+                                        try:
+                                            resolved = await get_image_url(icon_title, client)
+                                            if resolved:
+                                                item.image_url = resolved
+                                        except Exception as _:
+                                            pass
             except Exception as e:
                 logging.warning(f"Batch supplementary query failed for {name}: {e}. Falling back to individual queries.")
                 for field_to_query in valid_fields:
@@ -314,7 +370,7 @@ async def populate_item_details(item: Item, client: httpx.AsyncClient, include_m
                         if ind_items:
                             val = ind_items[0]["title"].get(field_to_query.replace("_", " "))
                             if val:
-                                item.stats[field_to_query.replace(" ", "_")] = val
+                                item.stats[field_to_query.replace(" ", "_")] = dehtmlize(str(val)) if isinstance(val, str) else val
                     except: pass
     
     return item
@@ -322,54 +378,240 @@ async def populate_item_details(item: Item, client: httpx.AsyncClient, include_m
 async def query_items(name_query: str, limit: int = 10, detailed: bool = False, include_mods: bool = True) -> List[Item]:
     """
     Queries the PoE Wiki Cargo database for items matching the name_query.
+    Uses per-table configurations with correct fields and joins to avoid MWExceptions.
     """
-    async with httpx.AsyncClient() as client:
-        params = {
-            "action": "cargoquery",
+    # Table-specific configurations
+    # Each config provides: tables (with optional aliases/joins), fields, where (uses table-qualified fields),
+    # and a default class to use when the result lacks a class field
+    table_configs = [
+        {
+            "key": "items",
             "tables": "items",
             "fields": "name,rarity,class,inventory_icon",
-            "where": f'name LIKE "%{name_query}%"',
+            "where": "name LIKE \"%{q}%\"",
             "order by": "drop_enabled DESC, name",
-            "limit": limit,
-            "format": "json"
+            "default_class": None,
+        },
+        {
+            "key": "skill",
+            "tables": "skill",
+            # Alias fields so downstream expects standard names
+            "fields": "active_skill_name=name,skill_icon=inventory_icon",
+            "where": "active_skill_name LIKE \"%{q}%\"",
+            "default_class": "Skill",
+        },
+        {
+            "key": "passive_skills",
+            "tables": "passive_skills",
+            "fields": "name,icon=inventory_icon,stat_text,flavour_text,reminder_text",
+            "where": "name LIKE \"%{q}%\"",
+            "default_class": "Passive Skill",
+        },
+        {
+            "key": "atlas_nodes",
+            # Join areas to fetch area name for user-facing search/display
+            "tables": "atlas_nodes=an,areas=a",
+            "join on": "an.area_id=a.id",
+            "fields": "a.name=name",
+            "where": "a.name LIKE \"%{q}%\"",
+            "default_class": "Atlas Node",
+        },
+        {
+            "key": "ascendancy_classes",
+            "tables": "ascendancy_classes",
+            "fields": "name",
+            "where": "name LIKE \"%{q}%\"",
+            "default_class": "Ascendancy Class",
+        },
+        {
+            "key": "main_pages",
+            "tables": "main_pages",
+            "fields": "name",
+            "where": "name LIKE \"%{q}%\"",
+            "default_class": "Main Page",
+        },
+        {
+            "key": "mastery_groups",
+            "tables": "mastery_groups",
+            "fields": "name,icon=inventory_icon",
+            "where": "name LIKE \"%{q}%\"",
+            "default_class": "Mastery Group",
+        },
+        {
+            "key": "mastery_effects",
+            "tables": "mastery_effects",
+            "fields": "stat_text=name,stat_text",
+            "where": "stat_text LIKE \"%{q}%\"",
+            "default_class": "Mastery Effect",
+        },
+        {
+            "key": "areas",
+            "tables": "areas",
+            "fields": "name",
+            "where": "name LIKE \"%{q}%\"",
+            "default_class": "Area",
+        },
+        {
+            "key": "events",
+            "tables": "events",
+            "fields": "name",
+            "where": "name LIKE \"%{q}%\"",
+            "default_class": "Event",
+        },
+        {
+            "key": "monsters",
+            "tables": "monsters",
+            "fields": "name",
+            "where": "name LIKE \"%{q}%\"",
+            "default_class": "Monster",
+        },
+        {
+            "key": "pantheon_souls",
+            "tables": "pantheon_souls",
+            "fields": "name,stat_text",
+            "where": "name LIKE \"%{q}%\"",
+            "default_class": "Pantheon Soul",
+        },
+    ]
+
+    async with httpx.AsyncClient() as client:
+        all_results: List[tuple[Dict[str, Any], str]] = []
+        seen_keys = set()
+
+        for cfg in table_configs:
+            if len(all_results) >= limit:
+                break
+
+            params = {
+                "action": "cargoquery",
+                "tables": cfg["tables"],
+                "fields": cfg["fields"],
+                "where": cfg["where"].format(q=name_query),
+                "limit": limit - len(all_results),
+                "format": "json",
+            }
+            if "join on" in cfg:
+                params["join on"] = cfg["join on"]
+            if "order by" in cfg:
+                params["order by"] = cfg["order by"]
+
+            try:
+                response = await client.get(settings.poe_wiki_api_url, params=params)
+                response.raise_for_status()
+                data = response.json()
+                if "error" in data:
+                    logging.error(f"Cargo error in table {cfg['key']}: {data['error']}")
+                    continue
+                for res in data.get("cargoquery", []):
+                    title = res.get("title", {})
+                    nm = title.get("name")
+                    if not nm:
+                        continue
+                    # Keep variants across tables (e.g., Idol vs Passive with same name)
+                    dedupe_key = (nm, cfg["key"])  # name + table key
+                    if dedupe_key not in seen_keys:
+                        all_results.append((title, cfg["key"]))
+                        seen_keys.add(dedupe_key)
+            except Exception as e:
+                logging.error(f"Failed to query table {cfg['key']}: {e}")
+
+        # Batch resolve image URLs (works with aliased inventory_icon where provided)
+        raw_icons = []
+        for item_data, _ in all_results:
+            val = item_data.get("inventory icon") or item_data.get("inventory_icon")
+            if val:
+                raw_icons.append(val)
+        # Separate direct URLs and file titles
+        direct_icon_map: Dict[str, str] = {}
+        cargo_titles: List[str] = []
+        for val in raw_icons:
+            if not val:
+                continue
+            v = str(val)
+            if v.startswith("http://") or v.startswith("https://"):
+                direct_icon_map[v] = v
+            elif v.startswith("File:"):
+                cargo_titles.append(v)
+            else:
+                # Unknown format: attempt as a File: title using the basename
+                import os
+                basename = os.path.basename(v)
+                if basename:
+                    cargo_titles.append(f"File:{basename}")
+        cargo_titles = list(sorted(set(cargo_titles)))
+        image_urls = await get_image_urls(cargo_titles, client) if cargo_titles else {}
+        # Build a case-insensitive fallback map to handle title case normalization from MediaWiki
+        image_urls_ci = {k.casefold(): v for k, v in image_urls.items()}
+
+        table_default_classes = {
+            "items": None,
+            "skill": "Skill",
+            "passive_skills": "Passive Skill",
+            "atlas_nodes": "Atlas Node",
+            "ascendancy_classes": "Ascendancy Class",
+            "main_pages": "Main Page",
+            "mastery_groups": "Mastery Group",
+            "mastery_effects": "Mastery Effect",
+            "areas": "Area",
+            "events": "Event",
+            "monsters": "Monster",
+            "pantheon_souls": "Pantheon Soul",
         }
-        
-        logging.info(f"Cargo query params: {params}")
-        response = await client.get(settings.poe_wiki_api_url, params=params)
-        response.raise_for_status()
-        data = response.json()
-        
-        if "error" in data:
-            logging.error(f"Cargo error: {data['error']}")
-            return []
-        
-        raw_results = [item["title"] for item in data.get("cargoquery", [])]
-        
-        # Batch resolve image URLs
-        icon_files = list(set(item.get("inventory icon") for item in raw_results if item.get("inventory icon")))
-        image_urls = await get_image_urls(icon_files, client) if icon_files else {}
-        
-        items = []
-        for item_data in raw_results:
+
+        items: List[Item] = []
+        for item_data, table_key in all_results:
             name = item_data.get("name") or "Unknown"
+            derived_class = item_data.get("class") or table_default_classes.get(table_key) or "Unknown"
+            inv_icon_val = item_data.get("inventory icon") or item_data.get("inventory_icon")
+            image_url = None
+            if inv_icon_val:
+                inv_icon_str = str(inv_icon_val)
+                image_url = (
+                    direct_icon_map.get(inv_icon_str)
+                    or image_urls.get(inv_icon_str)
+                    or image_urls_ci.get(inv_icon_str.casefold())
+                )
+                if not image_url and not inv_icon_str.startswith("File:"):
+                    # Try lookup by constructed File:basename
+                    import os
+                    basename = os.path.basename(inv_icon_str)
+                    if basename:
+                        image_url = image_urls.get(f"File:{basename}") or image_urls_ci.get(f"file:{basename}".casefold())
             item = Item(
                 name=name,
-                rarity=item_data.get("rarity") or "Unknown",
-                item_class=item_data.get("class") or "Unknown",
-                image_url=image_urls.get(item_data.get("inventory icon"))
+                rarity=item_data.get("rarity") or "Normal",
+                item_class=derived_class,
+                image_url=image_url
             )
-            
+
+            # Enrich non-item entities with description/icon-derived info when available
+            # Prefer meaningful text fields as description
+            desc_candidates = [
+                item_data.get("stat text"),
+                item_data.get("flavour text"),
+                item_data.get("description"),
+                item_data.get("reminder text"),
+            ]
+            for dc in desc_candidates:
+                if dc:
+                    item.description = dehtmlize(str(dc))
+                    break
+            # Preserve flavour text specifically if present
+            if item_data.get("flavour text"):
+                item.flavour_text = dehtmlize(str(item_data.get("flavour text")))
+
             if detailed:
                 await populate_item_details(item, client, include_mods=include_mods)
-            
+
             items.append(item)
-        
+
         return items
 
-async def get_item_details(name: str, include_mods: bool = True) -> Optional[Item]:
+async def get_item_details(name: str, include_mods: bool = True, desired_class: Optional[str] = None) -> Optional[Item]:
     """
     Fetches full details for a single item.
     Optimized to only perform detailed queries for the target item.
+    If desired_class is provided, prefers results whose item_class matches it.
     """
     async with httpx.AsyncClient() as client:
         # 1. Search for the item (undetailed) to find the exact match
@@ -379,11 +621,25 @@ async def get_item_details(name: str, include_mods: bool = True) -> Optional[Ite
         
         # 2. Find the best match
         target_item = None
-        for item in results:
-            if item.name.lower() == name.lower():
-                target_item = item
-                break
-        
+        # Prefer exact name and matching class first
+        if desired_class:
+            for item in results:
+                if item.name.lower() == name.lower() and item.item_class == desired_class:
+                    target_item = item
+                    break
+        # Fallback: any exact name match
+        if not target_item:
+            for item in results:
+                if item.name.lower() == name.lower():
+                    target_item = item
+                    break
+        # Fallback: partial match with desired class
+        if not target_item and desired_class:
+            for item in results:
+                if name.lower() in item.name.lower() and item.item_class == desired_class:
+                    target_item = item
+                    break
+        # Final fallback: any partial match
         if not target_item:
             for item in results:
                 if name.lower() in item.name.lower():

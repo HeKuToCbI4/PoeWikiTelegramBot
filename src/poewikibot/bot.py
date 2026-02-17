@@ -77,7 +77,8 @@ async def inline_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
     
         # Use a random UUID for ID to avoid any potential caching or duplicate issues in Telegram's feedback
-        result_id = f"{name}|{uuid.uuid4().hex[:8]}"
+        # Include class in result_id to disambiguate same-named entities (e.g., Idol vs Passive)
+        result_id = f"{item_class}::{name}|{uuid.uuid4().hex[:8]}"
         
         articles.append(
             InlineQueryResultArticle(
@@ -116,8 +117,12 @@ async def on_chosen_inline_result(update: Update, context: ContextTypes.DEFAULT_
     result_id = chosen_result.result_id
     logging.info(f"Chosen inline result received: {result_id}")
     
-    # Extract item name from result_id (format: "name|id")
-    item_name = result_id.split('|')[0] if '|' in result_id else result_id
+    # Extract item class and name from result_id (format: "Class::name|id")
+    rid_main = result_id.split('|')[0] if '|' in result_id else result_id
+    if '::' in rid_main:
+        item_class_hint, item_name = rid_main.split('::', 1)
+    else:
+        item_class_hint, item_name = None, rid_main
     inline_message_id = chosen_result.inline_message_id
 
     if not inline_message_id:
@@ -126,7 +131,7 @@ async def on_chosen_inline_result(update: Update, context: ContextTypes.DEFAULT_
         logging.debug(f"Full chosen_result dict: {chosen_result.to_dict()}")
         return
 
-    await resolve_item_details(item_name, context, inline_message_id=inline_message_id)
+    await resolve_item_details(item_name, context, inline_message_id=inline_message_id, item_class_hint=item_class_hint)
 
 async def on_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
@@ -162,7 +167,8 @@ async def resolve_item_details(
     context: ContextTypes.DEFAULT_TYPE, 
     inline_message_id: str = None,
     chat_id: int = None,
-    message_id: int = None
+    message_id: int = None,
+    item_class_hint: str = None
 ):
     """
     Shared logic to resolve item details and update an inline message.
@@ -171,7 +177,7 @@ async def resolve_item_details(
         msg_ref = inline_message_id or f"{chat_id}:{message_id}"
         logging.info(f"Phase 1: Resolving basic stats for: {item_name} (ref: {msg_ref})")
         # Phase 1: Fetch stats but skip mods for speed and reliability
-        item = await get_item_details(item_name, include_mods=False)
+        item = await get_item_details(item_name, include_mods=False, desired_class=item_class_hint)
         if not item:
             logging.warning(f"Could not find details for item: {item_name}. Attempting final fallback update.")
             try:
@@ -280,11 +286,13 @@ async def resolve_item_details(
 
             # Description (for currency items, etc.)
             if item_obj.description:
-                parts.append(f"{html.escape(item_obj.description)}")
+                desc = html.escape(item_obj.description).replace('&lt;br&gt;', '\n').replace('&lt;br/&gt;', '\n')
+                parts.append(f"{desc}")
 
             # Flavour text
             if item_obj.flavour_text:
-                parts.append(f"<i>{html.escape(item_obj.flavour_text)}</i>")
+                flav = html.escape(item_obj.flavour_text).replace('&lt;br&gt;', '\n').replace('&lt;br/&gt;', '\n')
+                parts.append(f"<i>{flav}</i>")
 
             # Hidden image link for preview
             image_part = ""

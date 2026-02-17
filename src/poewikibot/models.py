@@ -65,6 +65,11 @@ CLASS_TO_TABLE = {
     "Monster": "monsters",
     "Pantheon": "pantheon",
     "Passive Skill": "passive_skills",
+    "Atlas Node": "atlas_nodes",
+    "Stackable": "stackables",
+    "Ascendancy Class": "ascendancy_classes",
+    "Main Page": "main_pages",
+    "Idol": "idols",
 }
 
 # Fields to fetch for each table
