@@ -177,7 +177,10 @@ async def resolve_item_details(
         msg_ref = inline_message_id or f"{chat_id}:{message_id}"
         logging.info(f"Phase 1: Resolving basic stats for: {item_name} (ref: {msg_ref})")
         # Phase 1: Fetch stats but skip mods for speed and reliability
-        item = await get_item_details(item_name, include_mods=False, desired_class=item_class_hint)
+        if item_class_hint is not None:
+            item = await get_item_details(item_name, include_mods=False, desired_class=item_class_hint)
+        else:
+            item = await get_item_details(item_name, include_mods=False)
         if not item:
             logging.warning(f"Could not find details for item: {item_name}. Attempting final fallback update.")
             try:

@@ -353,6 +353,52 @@ async def populate_item_details(item: Item, client: httpx.AsyncClient, include_m
                                                 item.image_url = resolved
                                         except Exception as _:
                                             pass
+
+                    # Skill gem enrichment: prefer gem_description and fill explicit mods from skill.stat_text
+                    if supplementary_table == "skill_gems" or item.item_class in ("Skill Gem", "Support Gem", "Skill"):
+                        # Set a user-facing description for gems/skills
+                        if not item.description:
+                            gem_desc = sup_item.get("gem description") if supplementary_table == "skill_gems" else None
+                            if gem_desc:
+                                item.description = dehtmlize(str(gem_desc))
+                        # If still missing, query the skill table for richer text and icon
+                        try:
+                            skill_params = {
+                                "action": "cargoquery",
+                                "tables": "skill",
+                                "fields": "description,stat_text,skill_icon,skill_id,html",
+                                "where": f"_pageName='{safe_name}'",
+                                "format": "json",
+                            }
+                            skill_res = await client.get(settings.poe_wiki_api_url, params=skill_params)
+                            skill_items = skill_res.json().get("cargoquery", [])
+                            if skill_items:
+                                st = skill_items[0]["title"]
+                                if not item.description:
+                                    # Prefer skill.description, fall back to parsing description cell from html if necessary
+                                    if st.get("description"):
+                                        item.description = dehtmlize(str(st.get("description")))
+                                # Explicit mods approximated by stat_text for skill display
+                                if not item.explicit_mods and st.get("stat text"):
+                                    item.explicit_mods = dehtmlize(str(st.get("stat text"))).replace("\\n", "<br>")
+                                # Resolve icon if missing
+                                if not item.image_url and st.get("skill icon"):
+                                    icon_val = st.get("skill icon")
+                                    icon_title = icon_val if str(icon_val).startswith("File:") else None
+                                    if not icon_title:
+                                        import os
+                                        base = os.path.basename(str(icon_val))
+                                        if base:
+                                            icon_title = f"File:{base}"
+                                    if icon_title:
+                                        try:
+                                            resolved = await get_image_url(icon_title, client)
+                                            if resolved:
+                                                item.image_url = resolved
+                                        except Exception:
+                                            pass
+                        except Exception as _:
+                            pass
             except Exception as e:
                 logging.warning(f"Batch supplementary query failed for {name}: {e}. Falling back to individual queries.")
                 for field_to_query in valid_fields:
